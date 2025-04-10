@@ -81,7 +81,12 @@ export const createEvent = async (signer, eventDetails) => {
 };
 
 export const purchaseTicket = async (signer, eventId, chain) => {
-  const chainConfig = CHAINS[chain.toUpperCase()];
+  const chainKey = chain.toUpperCase();
+const chainConfig = CHAINS[chainKey];
+if (!chainConfig) {
+  throw new Error(`Unsupported chain: ${chainKey}`);
+}
+
   const ticketContract = new ethers.Contract(
     chainConfig.contracts.ticketNFT,
     TicketNFT.abi,

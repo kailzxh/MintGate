@@ -1,9 +1,9 @@
 import React from 'react';
-import { purchaseTicket } from '../utils/web3';
+import { connectWallet, purchaseTicket } from '../utils/web3';
 
 function EventCard({ event }) {
   const { id, title, date, chain, price, remaining, total, image } = event;
-  
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'long',
@@ -14,8 +14,9 @@ function EventCard({ event }) {
 
   const handlePurchase = async () => {
     try {
-      const txHash = await purchaseTicket(null, id, price);
-      alert(`Ticket purchased successfully! Transaction: ${txHash}`);
+      const signer = await connectWallet(); // ✅ Get signer from MetaMask
+      const tx = await purchaseTicket(signer, id, chain); // ✅ Correct usage
+      alert(`Ticket purchased successfully! Transaction: ${tx.transactionHash}`);
     } catch (error) {
       alert('Failed to purchase ticket: ' + error.message);
     }
@@ -30,7 +31,9 @@ function EventCard({ event }) {
           className="w-full h-full object-cover"
         />
         <div className="absolute top-4 right-4 bg-white px-3 py-1 rounded-full shadow-md">
-          <span className="font-medium">{chain === 'ethereum' ? 'ETH' : 'SOL'} {price}</span>
+          <span className="font-medium">
+            {chain === 'ethereum' ? 'ETH' : 'MATIC'} {price}
+          </span>
         </div>
       </div>
       <div className="p-6">
