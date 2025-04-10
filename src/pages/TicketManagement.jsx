@@ -51,13 +51,16 @@ function TicketManagement() {
                 </span>
                 {ticket.tokenURI && (
                   <a
-                    href={`https://ipfs.io/ipfs/${ticket.tokenURI.replace('ipfs://', '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-indigo-600 hover:text-indigo-800 font-medium"
-                  >
-                    View NFT
-                  </a>
+  href={ticket.tokenURI.startsWith("ipfs://")
+    ? `https://ipfs.io/ipfs/${ticket.tokenURI.replace("ipfs://", "")}`
+    : ticket.tokenURI}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="text-indigo-600 hover:text-indigo-800 font-medium"
+>
+  View NFT
+</a>
+
                 )}
               </div>
             </div>

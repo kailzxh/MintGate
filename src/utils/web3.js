@@ -82,10 +82,21 @@ export const createEvent = async (signer, eventDetails) => {
 
 export const purchaseTicket = async (signer, eventId, chain) => {
   const chainKey = chain.toUpperCase();
-const chainConfig = CHAINS[chainKey];
-if (!chainConfig) {
-  throw new Error(`Unsupported chain: ${chainKey}`);
-}
+  const chainConfig = CHAINS[chainKey];
+  if (!chainConfig) {
+    throw new Error(`Unsupported chain: ${chainKey}`);
+  }
+
+  // ✅ Initialize eventFactory here
+  const eventFactory = new ethers.Contract(
+    chainConfig.contracts.eventFactory,
+    EventFactory.abi,
+    signer
+  );
+
+  // ✅ Safely fetch event details
+  const eventDetails = await eventFactory.events(eventId);
+  const ipfsCID = eventDetails.ipfsCID;
 
   const ticketContract = new ethers.Contract(
     chainConfig.contracts.ticketNFT,
@@ -96,7 +107,7 @@ if (!chainConfig) {
   const tx = await ticketContract.mintTicket(
     await signer.getAddress(),
     eventId,
-    "sampleCID"
+    ipfsCID
   );
 
   const receipt = await tx.wait();
@@ -116,6 +127,7 @@ if (!chainConfig) {
 
   throw new Error("TicketMinted not found in logs");
 };
+
 
 export async function fetchCreatedEvents(provider, chain = 'POLYGON') {
   try {
