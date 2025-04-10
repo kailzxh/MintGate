@@ -165,3 +165,48 @@ export async function fetchCreatedEvents(provider, chain = 'POLYGON') {
     return [];
   }
 }
+
+export async function fetchUserTickets(address, provider, chain = 'POLYGON') {
+  try {
+    const chainKey = chain.toUpperCase();
+    const chainConfig = CHAINS[chainKey];
+    if (!chainConfig) throw new Error(`Unsupported chain: ${chainKey}`);
+
+    const ticketNFT = new ethers.Contract(
+      chainConfig.contracts.ticketNFT,
+      TicketNFT.abi,
+      provider
+    );
+
+    const iface = new Interface(TicketNFT.abi);
+    const filter = {
+      address: chainConfig.contracts.ticketNFT,
+      topics: [
+        ethers.id("TicketMinted(uint256,address,uint256)"),
+        null,
+        ethers.zeroPadValue(address, 32) // pad address for filtering logs
+      ],
+      fromBlock: 0,
+      toBlock: "latest"
+    };
+
+    const logs = await provider.getLogs(filter);
+    const tickets = await Promise.all(
+      logs.map(async (log) => {
+        const parsed = iface.parseLog(log);
+        const tokenId = parsed.args.tokenId.toString();
+        const tokenURI = await ticketNFT.tokenURI(tokenId);
+        return {
+          tokenId,
+          tokenURI,
+          chain: chain.toLowerCase(),
+        };
+      })
+    );
+
+    return tickets;
+  } catch (err) {
+    console.error("Failed to fetch user tickets:", err);
+    return [];
+  }
+}
