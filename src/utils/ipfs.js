@@ -2,14 +2,14 @@ import { Buffer } from 'buffer';
 
 const JWT = import.meta.env.VITE_PINATA_JWT;
 
-// ✅ Uploads metadata as `folder/metadata.json` and returns folder CID
+
 export const uploadToIPFS = async (metadata) => {
   try {
     const file = new File(
       [new Blob([JSON.stringify(metadata)], { type: 'application/json' })],
       'metadata.json'
     );
-
+  
     const formData = new FormData();
     formData.append('file', file, 'folder/metadata.json'); // Wrap in folder
 
@@ -34,7 +34,7 @@ export const uploadToIPFS = async (metadata) => {
   }
 };
 
-// ✅ Fetches metadata.json using folder CID
+
 export const getFromIPFS = async (cid) => {
   try {
     const res = await fetch(`https://gateway.pinata.cloud/ipfs/${cid}/metadata.json`);
