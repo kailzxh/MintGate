@@ -31,7 +31,8 @@
     "react-datepicker": "^6.1.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.1",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^3.4.1",
+    "web3": "^4.16.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
@@ -55,10 +56,12 @@
     "ethers": "^6.13.5",
     "hardhat": "^2.22.19",
     "hardhat-gas-reporter": "^1.0.10",
+    "node-polyfill": "^1.0.0",
     "solidity-coverage": "^0.8.14",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",
     "typescript": "^5.8.3",
-    "vite": "^5.1.0"
+    "vite": "^5.1.0",
+    "vite-plugin-node-polyfills": "^0.23.0"
   }
 }

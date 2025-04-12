@@ -228,7 +228,7 @@ function LoginForm() {
   );
 }
 
-function App() {
+function LogIn() {
   return (
     <Router>
       <AuthProvider>
@@ -256,4 +256,9 @@ function App() {
   );
 }
 
-export default App;
+// export default LogIn;
+// Export the forms for separate use:
+export { LoginForm, SignUpForm };
+
+// You can also choose to keep a default export if needed.
+// export default LogIn;
