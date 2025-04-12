@@ -1,20 +1,20 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './contexts/AuthContext';
-import { ProtectedRoute } from './components/ProtectedRoute';
+import { AuthProvider } from '../contexts/AuthContext';
+import { ProtectedRoute } from '../components/ProtectedRoute';
 import { LogIn, Lock, UserPlus } from 'lucide-react';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
-
 
 function SignUpForm() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
-  const { signUp } = useAuth();
+  const [phone, setPhone] = React.useState('');
+  const { signUp, signIn } = useAuth();
 
-  const handleSignUp = async (e) => {
+  const handleEmailSignUp = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
@@ -22,7 +22,40 @@ function SignUpForm() {
     }
     try {
       await signUp(email, password);
+      toast.success('Account created successfully!');
     } catch (error) {
+      toast.error('Error creating account');
+      console.error(error);
+    }
+  };
+
+  const handlePhoneSignUp = async (e) => {
+    e.preventDefault();
+    try {
+      await signIn.withPhone(phone);  // Assuming `signIn.withPhone` handles phone sign-up
+      toast.success('Phone number verification sent');
+    } catch (error) {
+      toast.error('Error with phone registration');
+      console.error(error);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    try {
+      await signIn.withGoogle();
+      toast.success('Signed up with Google');
+    } catch (error) {
+      toast.error('Error with Google sign-up');
+      console.error(error);
+    }
+  };
+
+  const handleMetaMaskSignUp = async () => {
+    try {
+      await signIn.withMetamask();
+      toast.success('Signed up with MetaMask');
+    } catch (error) {
+      toast.error('Error with MetaMask sign-up');
       console.error(error);
     }
   };
@@ -35,7 +68,7 @@ function SignUpForm() {
           <h2 className="mt-6 text-3xl font-bold text-gray-900">Create your account</h2>
         </div>
 
-        <form onSubmit={handleSignUp} className="mt-8 space-y-6">
+        <form onSubmit={handleEmailSignUp} className="mt-8 space-y-6">
           <div className="space-y-4">
             <input
               type="email"
@@ -67,16 +100,51 @@ function SignUpForm() {
             type="submit"
             className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
           >
-            Sign Up
+            Sign Up with Email
           </button>
-
-          <div className="text-sm text-center">
-            Already have an account?{' '}
-            <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
-              Sign in
-            </Link>
-          </div>
         </form>
+
+        {/* Option to sign up with phone number */}
+        <div className="mt-6">
+          <form onSubmit={handlePhoneSignUp}>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Phone number"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            />
+            <button
+              type="submit"
+              className="mt-2 w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Sign Up with Phone
+            </button>
+          </form>
+        </div>
+
+        {/* Buttons for signing up with Google and MetaMask */}
+        <div className="mt-6 grid grid-cols-1 gap-3">
+          <button
+            onClick={handleGoogleSignUp}
+            className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white hover:bg-gray-50"
+          >
+            Sign Up with Google
+          </button>
+          <button
+            onClick={handleMetaMaskSignUp}
+            className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white hover:bg-gray-50"
+          >
+            Sign Up with MetaMask
+          </button>
+        </div>
+
+        <div className="text-sm text-center">
+          Already have an account?{' '}
+          <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+            Sign in
+          </Link>
+        </div>
       </div>
     </div>
   );
@@ -228,7 +296,7 @@ function LoginForm() {
   );
 }
 
-function LogIn() {
+function AuthRoutes() {
   return (
     <Router>
       <AuthProvider>
@@ -256,9 +324,7 @@ function LogIn() {
   );
 }
 
-// export default LogIn;
-// Export the forms for separate use:
-export { LoginForm, SignUpForm };
+export default AuthRoutes;
 
-// You can also choose to keep a default export if needed.
-// export default LogIn;
+// Export forms for separate use:
+export { LoginForm, SignUpForm };
