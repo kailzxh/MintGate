@@ -3,27 +3,32 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ethers } from 'ethers';
 
-function Login() {
+function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState(''); // ✅ new state
   const navigate = useNavigate();
 
-  const handleEmailLogin = async (e) => {
+  const handleEmailSignup = async (e) => {
     e.preventDefault();
+    setError('');
+    setMessage('');
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
       if (error) throw error;
-      navigate('/dashboard');
+
+      // ✅ Show confirmation message if no error
+      setMessage('Confirmation email sent! Please check your inbox.');
     } catch (error) {
       setError(error.message);
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSignup = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -35,7 +40,7 @@ function Login() {
     }
   };
 
-  const handleMetaMaskLogin = async () => {
+  const handleMetaMaskSignup = async () => {
     try {
       if (!window.ethereum) {
         throw new Error('MetaMask is not installed');
@@ -45,8 +50,8 @@ function Login() {
       await provider.send("eth_requestAccounts", []);
       const signer = provider.getSigner();
       const address = await signer.getAddress();
-      
-      // Here you would typically verify the wallet address with your backend
+
+      // You would typically register this address
       console.log('Connected wallet:', address);
       navigate('/dashboard');
     } catch (error) {
@@ -59,15 +64,23 @@ function Login() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+            Create your account
           </h2>
         </div>
+
+        {/* ✅ Show success or error messages */}
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
             {error}
           </div>
         )}
-        <form className="mt-8 space-y-6" onSubmit={handleEmailLogin}>
+        {message && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+            {message}
+          </div>
+        )}
+
+        <form className="mt-8 space-y-6" onSubmit={handleEmailSignup}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <input
@@ -96,7 +109,7 @@ function Login() {
               type="submit"
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              Sign in
+              Sign up
             </button>
           </div>
         </form>
@@ -115,13 +128,13 @@ function Login() {
 
           <div className="mt-6 grid grid-cols-2 gap-3">
             <button
-              onClick={handleGoogleLogin}
+              onClick={handleGoogleSignup}
               className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
             >
               Google
             </button>
             <button
-              onClick={handleMetaMaskLogin}
+              onClick={handleMetaMaskSignup}
               className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
             >
               MetaMask
@@ -130,8 +143,8 @@ function Login() {
         </div>
 
         <div className="text-center mt-4">
-          {/* <Link to="/signup" className="text-indigo-600 hover:text-indigo-500">
-            Don't have an account? Sign up
+          {/* <Link to="/login" className="text-indigo-600 hover:text-indigo-500">
+            Already have an account? Sign in
           </Link> */}
         </div>
       </div>
@@ -139,4 +152,4 @@ function Login() {
   );
 }
 
-export default Login;
+export default Signup;
