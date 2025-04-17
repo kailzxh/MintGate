@@ -7,7 +7,7 @@ function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [message, setMessage] = useState(''); // ✅ new state
+  const [message, setMessage] = useState(''); 
   const navigate = useNavigate();
 
   const handleEmailSignup = async (e) => {
