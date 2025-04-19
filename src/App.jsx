@@ -53,7 +53,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-white text-black dark:bg-gray-900 dark:text-white transition-colors duration-300 min-h-screen bg-gray-50">
           <ProtectedRoute>
             <Navbar />
           </ProtectedRoute>
