@@ -16,3 +16,11 @@ export default {
     require('@tailwindcss/forms'),
   ],
 }
+module.exports = {
+  darkMode: 'class', 
+  content: ['./src/**/*.{js,jsx,ts,tsx}'],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
