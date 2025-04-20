@@ -30,7 +30,7 @@ function EventCard({ event }) {
           alt={title}
           className="w-full h-full object-cover"
         />
-        <div className="absolute top-4 right-4 bg-white px-3 py-1 rounded-full shadow-md">
+        <div className="bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 px-4 py-2 rounded absolute top-4 right-4 bg-white px-3 py-1 rounded-full shadow-md">
           <span className="font-medium">
             {chain === 'ethereum' ? 'ETH' : 'MATIC'} {price}
           </span>
@@ -40,7 +40,7 @@ function EventCard({ event }) {
         <h3 className="font-poppins font-semibold text-xl text-gray-900 mb-2">{title}</h3>
         <p className="text-gray-600 mb-4">{formatDate(date)}</p>
         <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-500">
+          <div className="bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 px-4 py-2 rounded text-sm text-gray-500">
             {remaining}/{total} available
           </div>
           <button 

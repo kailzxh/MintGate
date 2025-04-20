@@ -51,12 +51,12 @@ function EventMarketplace() {
   });
 
   return (
-    <div className="p-4">
+    <div className="p-4 ">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Upcoming Events</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4  text-gray-800 dark:bg-gray-900 dark:text-gray-100 px-4 py-2 rounded">Upcoming Events</h1>
         <div className="flex flex-wrap gap-4">
           <select
-            className="rounded-lg border-gray-300 p-2"
+            className="rounded-lg border-gray-300 p-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 px-4 py-2 rounded"
             value={filter.chain}
             onChange={(e) => setFilter({ ...filter, chain: e.target.value })}
           >
@@ -66,7 +66,7 @@ function EventMarketplace() {
             <option value="polygon">Polygon</option>
           </select>
           <select
-            className="rounded-lg border-gray-300 p-2"
+            className="rounded-lg border-gray-300 p-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 px-4 py-2 rounded"
             value={filter.date}
             onChange={(e) => setFilter({ ...filter, date: e.target.value })}
           >
@@ -76,7 +76,7 @@ function EventMarketplace() {
             <option value="month">This Month</option>
           </select>
           <select
-            className="rounded-lg border-gray-300 p-2"
+            className="rounded-lg border-gray-300 p-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 px-4 py-2 rounded"
             value={filter.price}
             onChange={(e) => setFilter({ ...filter, price: e.target.value })}
           >
@@ -87,13 +87,13 @@ function EventMarketplace() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ">
         {filteredEvents.length > 0 ? (
           filteredEvents.map((event) => (
             <EventCard key={event.id} event={event} />
           ))
         ) : (
-          <p className="text-gray-500">No events found.</p>
+          <p className="text-gray-500 ">No events found.</p>
         )}
       </div>
     </div>
