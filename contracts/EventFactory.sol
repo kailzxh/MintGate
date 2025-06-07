@@ -13,13 +13,16 @@ contract EventFactory is ERC1155, Ownable {
         string name;
         uint256 date;
         string ipfsCID;
+        string imageCID;
         address owner;
         bool active;
+        uint256 pricePerTicket; 
     }
 
     mapping(uint256 => Event) public events;
 
-    event EventCreated(uint256 indexed eventId, address indexed owner, string ipfsCID);
+    event EventCreated(uint256 indexed eventId, address indexed owner, string ipfsCID, string imageCID);
+
 
     constructor() ERC1155("") Ownable() {}
 
@@ -27,7 +30,10 @@ contract EventFactory is ERC1155, Ownable {
         string memory name,
         uint256 date,
         string memory ipfsCID,
-        uint256 maxTickets
+        string memory imageCID,
+        uint256 maxTickets,
+        uint256 pricePerTicket
+
     ) external returns (uint256) {
         require(date > block.timestamp, "Event date must be in the future");
         require(bytes(ipfsCID).length > 0, "IPFS CID required");
@@ -39,13 +45,15 @@ contract EventFactory is ERC1155, Ownable {
             name: name,
             date: date,
             ipfsCID: ipfsCID,
+            imageCID: imageCID,
             owner: msg.sender,
-            active: true
+            active: true,
+            pricePerTicket: pricePerTicket
         });
 
         _mint(msg.sender, eventId, maxTickets, "");
 
-        emit EventCreated(eventId, msg.sender, ipfsCID);
+        emit EventCreated(eventId, msg.sender, ipfsCID, imageCID);
         return eventId;
     }
 
@@ -56,4 +64,64 @@ contract EventFactory is ERC1155, Ownable {
     function isValidEvent(uint256 eventId) public view returns (bool) {
         return events[eventId].active && events[eventId].date > block.timestamp;
     }
+
+    event TicketPurchased(uint256 indexed eventId, address indexed buyer, uint256 amount);
+
+    function purchaseTicket(uint256 eventId, uint256 amount) external payable {
+    Event storage evt = events[eventId];
+    require(evt.active, "Event is not active");
+    require(evt.date > block.timestamp, "Event has already occurred");
+
+    uint256 totalPrice = evt.pricePerTicket * amount;
+    require(msg.value >= totalPrice, "Insufficient payment");
+
+    
+    uint256 creatorBalance = balanceOf(evt.owner, eventId);
+    require(creatorBalance >= amount, "Not enough tickets remaining");
+
+    
+    safeTransferFrom(evt.owner, msg.sender, eventId, amount, "");
+
+    
+    (bool success, ) = payable(evt.owner).call{value: totalPrice}("");
+    require(success, "Payment transfer failed");
+
+    
+    if (msg.value > totalPrice) {
+        (bool refundSuccess, ) = payable(msg.sender).call{value: msg.value - totalPrice}("");
+        require(refundSuccess, "Refund failed");
+    }
+    emit TicketPurchased(eventId, msg.sender, amount);
+
+    }
+    function deactivateEvent(uint256 eventId) external {
+    require(events[eventId].owner == msg.sender, "Only event owner can deactivate");
+    events[eventId].active = false;
+    }
+
+
+    function getEventDetails(uint256 eventId) external view returns (
+    string memory name,
+    uint256 date,
+    string memory ipfsCID,
+    string memory imageCID,   
+    address owner,
+    bool active,
+    uint256 pricePerTicket,
+    uint256 ticketsRemaining
+) {
+    Event storage evt = events[eventId];
+    return (
+        evt.name,
+        evt.date,
+        evt.ipfsCID,
+        evt.imageCID,     
+        evt.owner,
+        evt.active,
+        evt.pricePerTicket,
+        balanceOf(evt.owner, eventId)
+    );
+}
+
+
 }

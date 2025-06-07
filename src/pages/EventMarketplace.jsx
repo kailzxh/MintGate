@@ -17,7 +17,7 @@ function EventMarketplace() {
         const provider = signer.provider;
         const allEvents = await fetchCreatedEvents(provider, 'POLYGON');
 
-        // Filter only future events
+       
         const now = Date.now();
         const upcoming = allEvents.filter((e) => new Date(e.date).getTime() > now);
         setEvents(upcoming);

@@ -4,17 +4,32 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { connectWallet, createEvent } from '../utils/web3';
 
-function EventHosting() {
+async function EventHosting() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: '',
     date: new Date(),
-    price: '',          // Not currently used in createEvent
+    price: '',          
     totalTickets: '',
     description: '',
-    image: '',          // Not currently used in createEvent
+    image: '',          
     chain: 'ethereum'
   });
+
+    const imageFormData = new FormData();
+    imageFormData.append('file', formData.image);
+
+    const imageRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${JWT}`
+      },
+      body: imageFormData
+    });
+
+    const imageResult = await imageRes.json();
+    const imageCID = imageResult.IpfsHash;
+    const imageURL = `ipfs://${imageCID}`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,8 +44,10 @@ function EventHosting() {
         date: formData.date,
         description: formData.description,
         chain: formData.chain,
-        maxTickets: parseInt(formData.totalTickets, 10)
-        // Optionally: You could add additional properties, such as price or image if supported.
+        maxTickets: parseInt(formData.totalTickets, 10),
+        price: formData.price,               
+        image: formData.imageIpfsUrl || ''
+        
       };
 
       // Call createEvent with the signer and event details.
