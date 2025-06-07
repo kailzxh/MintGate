@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 contract EventFactory is ERC1155, Ownable {
     using Counters for Counters.Counter;
     Counters.Counter private _eventIds;
+    address public ticketNFTContract;
 
     struct Event {
         string name;
@@ -109,7 +110,7 @@ contract EventFactory is ERC1155, Ownable {
     bool active,
     uint256 pricePerTicket,
     uint256 ticketsRemaining
-) {
+    ) {
     Event storage evt = events[eventId];
     return (
         evt.name,
@@ -121,7 +122,22 @@ contract EventFactory is ERC1155, Ownable {
         evt.pricePerTicket,
         balanceOf(evt.owner, eventId)
     );
-}
+    }
+
+        
+    function setTicketNFTContract(address _ticketNFT) external onlyOwner {
+        ticketNFTContract = _ticketNFT;
+    }
+
+    function burn(address from, uint256 eventId, uint256 amount) external {
+        require(msg.sender == ticketNFTContract, "Only TicketNFT can burn");
+        _burn(from, eventId, amount);
+    }
+
+    function ticketBalanceOf(address user, uint256 eventId) external view returns (uint256) {
+        return balanceOf(user, eventId);
+    }
+
 
 
 }
