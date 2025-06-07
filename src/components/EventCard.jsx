@@ -14,8 +14,8 @@ function EventCard({ event }) {
 
   const handlePurchase = async () => {
     try {
-      const signer = await connectWallet(); // ✅ Get signer from MetaMask
-      const tx = await purchaseTicket(signer, id, chain); // ✅ Correct usage
+      const signer = await connectWallet(); 
+      const tx = await purchaseTicket(signer, id, chain); 
       alert(`Ticket purchased successfully! Transaction: ${tx.transactionHash}`);
     } catch (error) {
       alert('Failed to purchase ticket: ' + error.message);
@@ -37,6 +37,9 @@ function EventCard({ event }) {
         </div>
       </div>
       <div className="p-6">
+
+
+        
         <h3 className="font-poppins font-semibold text-xl text-gray-900 mb-2">{title}</h3>
         <p className="text-gray-600 mb-4">{formatDate(date)}</p>
         <div className="flex justify-between items-center">

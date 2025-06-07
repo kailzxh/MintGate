@@ -143,7 +143,7 @@ export async function fetchCreatedEvents(provider, chain = 'POLYGON') {
       topics: [
         ethers.id("EventCreated(uint256,address,string)")
       ],
-      fromBlock: 0,
+      fromBlock: 20212544,
       toBlock: "latest",
     };
 
@@ -198,7 +198,7 @@ export async function fetchUserTickets(address, provider, chain = 'POLYGON') {
         null,
         ethers.zeroPadValue(address, 32) // pad address for filtering logs
       ],
-      fromBlock: 0,
+      fromBlock: 20212544,
       toBlock: "latest"
     };
 
