@@ -4,7 +4,16 @@ require("@openzeppelin/hardhat-upgrades");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 const config = {
-  solidity: "0.8.20",
+  solidity: {
+    version: "0.8.20",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+      viaIR: true,
+    },
+  },
   networks: {
     hardhat: {},
     ethereum: {
@@ -19,8 +28,8 @@ const config = {
   etherscan: {
     apiKey: {
       polygon: process.env.POLYGONSCAN_API_KEY,
-      polygonAmoy: process.env.POLYGONSCAN_API_KEY, // <-- for Amoy testnet
-      sepolia: process.env.ETHERSCAN_API_KEY,        // <-- for Ethereum Sepolia
+      polygonAmoy: process.env.POLYGONSCAN_API_KEY, 
+      sepolia: process.env.ETHERSCAN_API_KEY,       
     },
   },
 };
