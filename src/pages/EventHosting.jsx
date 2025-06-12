@@ -1,75 +1,72 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
-import "react-datepicker/dist/react-datepicker.css";
+import 'react-datepicker/dist/react-datepicker.css';
 import { connectWallet, createEvent } from '../utils/web3';
 
-async function EventHosting() {
+function EventHosting() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: '',
     date: new Date(),
-    price: '',          
+    price: '',
     totalTickets: '',
     description: '',
-    image: '',          
-    chain: 'ethereum'
+    imageFile: null,
+    chain: 'ethereum',
   });
-
-    const imageFormData = new FormData();
-    imageFormData.append('file', formData.image);
-
-    const imageRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${JWT}`
-      },
-      body: imageFormData
-    });
-
-    const imageResult = await imageRes.json();
-    const imageCID = imageResult.IpfsHash;
-    const imageURL = `ipfs://${imageCID}`;
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const { title, date, price, totalTickets, description, imageFile, chain } = formData;
+
+    const priceValue = parseFloat(price);
+    const ticketCount = parseInt(totalTickets);
+
+    if (
+      !title || !description || !imageFile ||
+      isNaN(priceValue) || priceValue <= 0 ||
+      isNaN(ticketCount) || ticketCount <= 0
+    ) {
+      alert('Please fill in all fields with valid values.');
+      return;
+    }
+
     try {
-      // Ensure a wallet is connected:
+      setLoading(true);
       const signer = await connectWallet();
-      console.log("Connected signer:", await signer.getAddress());
 
-      // Prepare the event details to match what createEvent() expects.
-      const eventDetails = {
-        name: formData.title,
-        date: formData.date,
-        description: formData.description,
-        chain: formData.chain,
-        maxTickets: parseInt(formData.totalTickets, 10),
-        price: formData.price,               
-        image: formData.imageIpfsUrl || ''
-        
-      };
+      const result = await createEvent(signer, {
+        name: title,
+        description,
+        date,
+        chain,
+        maxTickets: ticketCount,
+        imageFile,
+        price: priceValue,
+      });
 
-      // Call createEvent with the signer and event details.
-      const result = await createEvent(signer, eventDetails);
-      alert(`Event created successfully!\nTransaction hash: ${result.transactionHash}`);
+      alert(`✅ Event created!\nTX Hash: ${result.transactionHash}`);
       navigate('/');
-    } catch (error) {
-      console.error("Failed to create event:", error);
-      alert('Failed to create event: ' + error.message);
+    } catch (err) {
+      console.error(err);
+      alert(`❌ ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <h1 className="text-4xl font-bold text-gray-900 mb-8">Host New Event</h1>
+    <div className="max-w-2xl mx-auto p-4">
+      <h1 className="text-4xl font-bold mb-8 text-gray-900">Host New Event</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700">Event Title</label>
           <input
             type="text"
             required
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
           />
@@ -80,7 +77,9 @@ async function EventHosting() {
           <DatePicker
             selected={formData.date}
             onChange={(date) => setFormData({ ...formData, date })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+            minDate={new Date()}
+            dateFormat="yyyy-MM-dd"
           />
         </div>
 
@@ -88,9 +87,10 @@ async function EventHosting() {
           <label className="block text-sm font-medium text-gray-700">Ticket Price (ETH)</label>
           <input
             type="number"
-            step="0.001"
+            step="0.0001"
+            min="0"
             required
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             value={formData.price}
             onChange={(e) => setFormData({ ...formData, price: e.target.value })}
           />
@@ -100,8 +100,9 @@ async function EventHosting() {
           <label className="block text-sm font-medium text-gray-700">Total Tickets</label>
           <input
             type="number"
+            min="1"
             required
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             value={formData.totalTickets}
             onChange={(e) => setFormData({ ...formData, totalTickets: e.target.value })}
           />
@@ -110,12 +111,11 @@ async function EventHosting() {
         <div>
           <label className="block text-sm font-medium text-gray-700">Blockchain</label>
           <select
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             value={formData.chain}
             onChange={(e) => setFormData({ ...formData, chain: e.target.value })}
           >
             <option value="ethereum">Ethereum</option>
-            <option value="solana">Solana</option>
             <option value="polygon">Polygon</option>
           </select>
         </div>
@@ -124,29 +124,32 @@ async function EventHosting() {
           <label className="block text-sm font-medium text-gray-700">Description</label>
           <textarea
             required
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            rows="4"
+            rows={4}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Image URL</label>
+          <label className="block text-sm font-medium text-gray-700">Event Image</label>
           <input
-            type="url"
+            type="file"
+            accept="image/*"
             required
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            value={formData.image}
-            onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, imageFile: e.target.files[0] })}
+            className="mt-1 block w-full text-gray-700"
           />
         </div>
 
         <button
           type="submit"
-          className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+          disabled={loading}
+          className={`w-full py-2 px-4 rounded-lg font-medium text-white ${
+            loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+          }`}
         >
-          Create Event
+          {loading ? 'Creating Event...' : 'Create Event'}
         </button>
       </form>
     </div>
