@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { connectWallet, createEvent } from '../utils/web3';
+import { connectWallet, createEvent, CHAINS } from '../utils/web3';
 
 function EventHosting() {
   const navigate = useNavigate();
@@ -13,19 +13,19 @@ function EventHosting() {
     totalTickets: '',
     description: '',
     imageFile: null,
-    chain: 'ethereum',
   });
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { title, date, price, totalTickets, description, imageFile, chain } = formData;
-
+    const { title, date, price, totalTickets, description, imageFile } = formData;
     const priceValue = parseFloat(price);
-    const ticketCount = parseInt(totalTickets);
+    const ticketCount = parseInt(totalTickets, 10);
 
     if (
-      !title || !description || !imageFile ||
+      !title ||
+      !description ||
+      !imageFile ||
       isNaN(priceValue) || priceValue <= 0 ||
       isNaN(ticketCount) || ticketCount <= 0
     ) {
@@ -33,15 +33,35 @@ function EventHosting() {
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
+      // 1. Connect wallet & detect network
       const signer = await connectWallet();
+    // MetaMask injects chainId as a hex string (e.g. "0x1388"), so parse that:
+     const rawChainId = window.ethereum.chainId; 
+     console.log(rawChainId);
+     
+    const chainId = parseInt(rawChainId, 16);
+    console.log(chainId);
 
+
+      let chainKey;
+      if (chainId === 80002) {
+        chainKey = 'Polygon';
+      } else if (chainId === CHAINS.ETHEREUM.id) {
+        chainKey = 'ethereum';
+      } else {
+        alert(`Unsupported network (chainId=${chainId}). Please switch to Polygon or Ethereum.`);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Call your shared createEvent util
       const result = await createEvent(signer, {
         name: title,
         description,
         date,
-        chain,
+        chain: chainKey,
         maxTickets: ticketCount,
         imageFile,
         price: priceValue,
@@ -61,83 +81,68 @@ function EventHosting() {
     <div className="max-w-2xl mx-auto p-4">
       <h1 className="text-4xl font-bold mb-8 text-gray-900">Host New Event</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Event Title</label>
           <input
-            type="text"
-            required
+            type="text" required
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            onChange={e => setFormData({ ...formData, title: e.target.value })}
           />
         </div>
 
+        {/* Date */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Date</label>
           <DatePicker
             selected={formData.date}
-            onChange={(date) => setFormData({ ...formData, date })}
+            onChange={date => setFormData({ ...formData, date })}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             minDate={new Date()}
             dateFormat="yyyy-MM-dd"
           />
         </div>
 
+        {/* Price */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Ticket Price (ETH)</label>
           <input
-            type="number"
-            step="0.0001"
-            min="0"
-            required
+            type="number" step="0.0001" min="0" required
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             value={formData.price}
-            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+            onChange={e => setFormData({ ...formData, price: e.target.value })}
           />
         </div>
 
+        {/* Total Tickets */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Total Tickets</label>
           <input
-            type="number"
-            min="1"
-            required
+            type="number" min="1" required
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             value={formData.totalTickets}
-            onChange={(e) => setFormData({ ...formData, totalTickets: e.target.value })}
+            onChange={e => setFormData({ ...formData, totalTickets: e.target.value })}
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Blockchain</label>
-          <select
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-            value={formData.chain}
-            onChange={(e) => setFormData({ ...formData, chain: e.target.value })}
-          >
-            <option value="ethereum">Ethereum</option>
-            <option value="polygon">Polygon</option>
-          </select>
-        </div>
-
+        {/* Description */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Description</label>
           <textarea
-            required
-            rows={4}
+            rows={4} required
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={e => setFormData({ ...formData, description: e.target.value })}
           />
         </div>
 
+        {/* Image */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Event Image</label>
           <input
-            type="file"
-            accept="image/*"
-            required
-            onChange={(e) => setFormData({ ...formData, imageFile: e.target.files[0] })}
+            type="file" accept="image/*" required
+            onChange={e => setFormData({ ...formData, imageFile: e.target.files[0] })}
             className="mt-1 block w-full text-gray-700"
           />
         </div>

@@ -1,3 +1,4 @@
+// scripts/deploy.js
 const hre = require("hardhat");
 
 async function main() {
@@ -6,60 +7,68 @@ async function main() {
 
   console.log("Deploying contracts with account:", deployer.address);
 
-  // Deploy EventFactory
+  // 1) Deploy EventFactory
   const EventFactory = await ethers.getContractFactory("EventFactory");
   const eventFactory = await EventFactory.deploy();
   await eventFactory.waitForDeployment();
-  const eventFactoryAddress = await eventFactory.getAddress();  // FIXED
-  console.log("EventFactory deployed:", eventFactoryAddress);
+  console.log("  ↳ EventFactory:", eventFactory.target);
 
-  // Deploy TicketNFT
+  // 2) Deploy TicketNFT and point it at EventFactory
   const TicketNFT = await ethers.getContractFactory("TicketNFT");
-  const ticketNFT = await TicketNFT.deploy(eventFactoryAddress);
+  const ticketNFT = await TicketNFT.deploy(eventFactory.target);
   await ticketNFT.waitForDeployment();
-  const ticketNFTAddress = await ticketNFT.getAddress();  // FIXED
-  console.log("TicketNFT deployed:", ticketNFTAddress);
+  console.log("  ↳ TicketNFT:", ticketNFT.target);
 
-  // Deploy POAPDistributor
+  // 3) Wire them up:
+  //
+  //   • EventFactory needs to know who its TicketNFT is (so it can burn ERC1155 tokens)
+  //   • TicketNFT needs to know who its minter is
+  console.log("Wiring EventFactory ⇄ TicketNFT...");
+  await (await eventFactory.setTicketNFTContract(ticketNFT.target)).wait();
+  await (await ticketNFT.setMinter(eventFactory.target)).wait();
+
+  // 4) Deploy POAPDistributor pointing at TicketNFT
   const POAPDistributor = await ethers.getContractFactory("POAPDistributor");
-  const poapDistributor = await POAPDistributor.deploy(ticketNFTAddress);
+  const poapDistributor = await POAPDistributor.deploy(ticketNFT.target);
   await poapDistributor.waitForDeployment();
-  const poapDistributorAddress = await poapDistributor.getAddress();  // FIXED
-  console.log("POAPDistributor deployed:", poapDistributorAddress);
+  console.log("  ↳ POAPDistributor:", poapDistributor.target);
 
-  // Deploy CrossChainVerifier
+  // 5) Deploy CrossChainVerifier (if you have one)
   const CrossChainVerifier = await ethers.getContractFactory("CrossChainVerifier");
   const crossChainVerifier = await CrossChainVerifier.deploy();
   await crossChainVerifier.waitForDeployment();
-  const crossChainVerifierAddress = await crossChainVerifier.getAddress();  // FIXED
-  console.log("CrossChainVerifier deployed:", crossChainVerifierAddress);
+  console.log("  ↳ CrossChainVerifier:", crossChainVerifier.target);
 
-  // Setup cross-chain mappings
-  await crossChainVerifier.setChainTicketContract(137, ticketNFTAddress); // Polygon chainId
+  // 6) (Optional) set up any cross-chain mappings
+  //    e.g. if on Polygon (chainId 137) you want to be able to verify TicketNFTs:
+  await (await crossChainVerifier.setChainTicketContract(
+    /* chainId: */ 137,
+    ticketNFT.target
+  )).wait();
 
-  console.log("\nDeployment complete:");
-  console.log("EventFactory:", eventFactoryAddress);
-  console.log("TicketNFT:", ticketNFTAddress);
-  console.log("POAPDistributor:", poapDistributorAddress);
-  console.log("CrossChainVerifier:", crossChainVerifierAddress);
+  console.log("\nDeployment complete!");
+  console.log("  • EventFactory       :", eventFactory.target);
+  console.log("  • TicketNFT          :", ticketNFT.target);
+  console.log("  • POAPDistributor    :", poapDistributor.target);
+  console.log("  • CrossChainVerifier:", crossChainVerifier.target);
 
-  // Verify contracts if API key provided
+  // 7) (Optional) verify on Etherscan if you have an ETHERSCAN_API_KEY
   if (process.env.ETHERSCAN_API_KEY) {
-    console.log("Verifying contracts on Etherscan...");
+    console.log("\n🔍 Verifying contracts on Etherscan...");
     await hre.run("verify:verify", {
-      address: eventFactoryAddress,
+      address: eventFactory.target,
       constructorArguments: [],
     });
     await hre.run("verify:verify", {
-      address: ticketNFTAddress,
-      constructorArguments: [eventFactoryAddress],
+      address: ticketNFT.target,
+      constructorArguments: [eventFactory.target],
     });
     await hre.run("verify:verify", {
-      address: poapDistributorAddress,
-      constructorArguments: [ticketNFTAddress],
+      address: poapDistributor.target,
+      constructorArguments: [ticketNFT.target],
     });
     await hre.run("verify:verify", {
-      address: crossChainVerifierAddress,
+      address: crossChainVerifier.target,
       constructorArguments: [],
     });
   }
@@ -67,4 +76,7 @@ async function main() {
 
 main()
   .then(() => process.exit(0))
-  .catch(console.error);
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

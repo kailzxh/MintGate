@@ -1,8 +1,8 @@
-import { ethers, Interface, parseEther } from 'ethers';
+import { ethers, Interface, parseEther } from 'ethers'
+
 import EventFactoryJson from '../../artifacts/contracts/EventFactory.sol/EventFactory.json';
 import TicketNFTJson from '../../artifacts/contracts/TicketNFT.sol/TicketNFT.json';
 import { uploadToIPFS, getFromIPFS, IPFS_GATEWAY } from './ipfs';
-import { BigNumber } from 'ethers';
 
 
 export const CHAINS = {
@@ -34,20 +34,17 @@ export async function connectWallet() {
   return provider.getSigner();
 }
 
-// Get EventFactory contract instance
 export function getEventFactoryContract(signerOrProvider, chain = 'POLYGON') {
   const cfg = CHAINS[chain.toUpperCase()];
   if (!cfg) throw new Error(`Unsupported chain: ${chain}`);
   return new ethers.Contract(cfg.contracts.eventFactory, EventFactoryJson.abi, signerOrProvider);
 }
 
-// Get TicketNFT contract instance
 export function getTicketNFTContract(signerOrProvider, chain = 'POLYGON') {
   const cfg = CHAINS[chain.toUpperCase()];
   if (!cfg) throw new Error(`Unsupported chain: ${chain}`);
   return new ethers.Contract(cfg.contracts.ticketNFT, TicketNFTJson.abi, signerOrProvider);
 }
-
 
 // Create a new event
 export async function createEvent(signer, details) {
@@ -57,108 +54,137 @@ export async function createEvent(signer, details) {
     throw new Error('Missing required event details');
   }
 
-  const ticketCount = parseInt(maxTickets, 10);
+  const ticketCount = BigInt(maxTickets);
   const priceValue = parseFloat(price);
-  if (isNaN(ticketCount) || ticketCount <= 0) throw new Error('maxTickets must be > 0');
+  if (ticketCount <= 0) throw new Error('maxTickets must be > 0');
   if (isNaN(priceValue) || priceValue <= 0) throw new Error('price must be > 0');
 
-  const sel = new Date(date);
-  sel.setUTCHours(0, 0, 0, 0);
-  sel.setUTCDate(sel.getUTCDate() + 1);
-  let eventTimestamp = Math.floor(sel.getTime() / 1000);
+  // Convert date to midnight UTC + 1 day
+  const selectedDate = new Date(date);
+  selectedDate.setUTCHours(0, 0, 0, 0);
+  selectedDate.setUTCDate(selectedDate.getUTCDate() + 1);
+  let eventTimestamp = Math.floor(selectedDate.getTime() / 1000);
 
   const provider = signer.provider;
   const latest = await provider.getBlock('latest');
   if (eventTimestamp <= latest.timestamp) {
-    eventTimestamp = latest.timestamp + 3600;
+    eventTimestamp = latest.timestamp + 3600; // 1 hour into the future
   }
 
-  const { cid: imageCIDObj } = await uploadToIPFS(imageFile);
-  const imageCID = imageCIDObj.toString(); // ✅ get plain CID string
+  // Upload image
+  const { cid: imageCID } = await uploadToIPFS(imageFile);
 
-
+  // Upload metadata
   const metadata = {
     name,
     description,
     image: `ipfs://${imageCID}/${imageFile.name || 'image.png'}`,
     date: eventTimestamp,
     chain,
-    totalTickets: ticketCount,
+    ticketCount: Number(ticketCount),
     pricePerTicket: priceValue,
   };
-  const { cid: metadataCIDObj } = await uploadToIPFS(metadata);
-const metadataCID = metadataCIDObj.toString(); // ✅ get plain CID string
+  const { cid: metadataCID } = await uploadToIPFS(metadata);
 
-
+  // Prepare contract
   const eventFactory = getEventFactoryContract(signer, chain);
   const priceInWei = parseEther(priceValue.toString());
-  console.log("metadataCID", metadataCID); // ✅ good
-console.log({ 
-  metadataCID, 
-  typeofMetadataCID: typeof metadataCID 
-}); // ✅ fixed
 
-console.log("Final data types before sending:");
-console.log({
-  name,
-  eventTimestamp,
-  metadataCID,
-  imageCID,
-  ticketCount,
-  typeofTicketCount: typeof ticketCount,
-  priceInWei: priceInWei.toString(),
-  typeofPriceInWei: typeof priceInWei
-});
+  console.log("Final data before transaction:", {
+    name,
+    eventTimestamp,
+    metadataCID: metadataCID.toString(),
+    imageCID: imageCID.toString(),
+    ticketCount: ticketCount.toString(),
+    priceInWei: priceInWei.toString(),
+  });
 
+  // Optional: callStatic debug for timestamp
+  try {
+    await eventFactory.callStatic.createEvent(
+      name,
+      eventTimestamp,
+      metadataCID.toString(),
+      imageCID.toString(),
+      ticketCount,
+      priceInWei
+    );
+  } catch (err) {
+    const logs = err.error?.logs || [];
+    const topic = ethers.id("DebugTimestamps(uint256,uint256)");
+    const dbg = logs.find(l => l.topics[0] === topic);
+    if (dbg) {
+      const { args } = new Interface(EventFactoryJson.abi).parseLog(dbg);
+      console.log('↳ on-chain now:', args.nowTime.toString());
+      console.log('↳ your input date:', args.inputDate.toString());
+      throw new Error('Your chosen date is before the current block timestamp.');
+    }
+  }
 
-
+  // Estimate gas
   let gasLimit;
   try {
     const estimate = await eventFactory.createEvent.estimateGas(
       name,
       eventTimestamp,
-      metadataCID,
-      imageCID,
+      metadataCID.toString(),
+      imageCID.toString(),
       ticketCount,
       priceInWei
     );
-    gasLimit = estimate.mul(2);
+    gasLimit = estimate * 2n; // Use BigInt if using ethers v6
   } catch (err) {
+    console.error('Gas estimate failed:', err);
     const reason = err?.error?.message || err?.message || 'Gas estimation failed';
     throw new Error(`Cannot create event: ${reason}`);
   }
 
+  // Send transaction
   const tx = await eventFactory.createEvent(
-  name,
-  eventTimestamp,
-  metadataCID,
-  imageCID,
-  BigNumber.from(ticketCount),
-  priceInWei,
-  { gasLimit }
-);
+    name,
+    eventTimestamp,
+    metadataCID.toString(),
+    imageCID.toString(),
+    ticketCount,
+    priceInWei
+    // { gasLimit }
+  );
 
   const receipt = await tx.wait();
 
   const iface = new Interface(EventFactoryJson.abi);
+  let createdEvent = null;
+
   for (const log of receipt.logs) {
     try {
       const parsed = iface.parseLog(log);
+
+      if (parsed.name === 'DebugTimestamps') {
+        console.log('🕒 On-chain time:', parsed.args.nowTime.toString());
+        console.log('📅 Provided date:', parsed.args.inputDate.toString());
+      }
+
       if (parsed.name === 'EventCreated') {
-        return {
+        createdEvent = {
           eventId: parsed.args.eventId.toString(),
-          ipfsCID: metadataCID,
-          imageCID,
+          ipfsCID: metadataCID.toString(),
+          imageCID: imageCID.toString(),
           transactionHash: receipt.transactionHash,
         };
       }
-    } catch {}
+    } catch (err) {
+      // Ignore non-matching logs
+    }
   }
 
-  throw new Error('EventCreated event not found in logs');
+  if (!createdEvent) {
+    throw new Error('EventCreated event not found in logs');
+  }
+
+  return createdEvent;
 }
 
-// Purchase a ticket
+// Purchase ticket
 export async function purchaseTicket(signer, eventId, chain) {
   const cfg = CHAINS[chain.toUpperCase()];
   if (!cfg) throw new Error(`Unsupported chain: ${chain}`);
@@ -188,11 +214,9 @@ export async function purchaseTicket(signer, eventId, chain) {
   throw new Error('TicketMinted event not found in logs');
 }
 
-// Fetch all created events
+// Fetch created events
 export async function fetchCreatedEvents(provider, chain = 'POLYGON') {
   const cfg = CHAINS[chain.toUpperCase()];
-  if (!cfg) throw new Error(`Unsupported chain: ${chain}`);
-
   const factoryAddr = cfg.contracts.eventFactory;
   const iface = new Interface(EventFactoryJson.abi);
   const filter = {
@@ -232,11 +256,9 @@ export async function fetchCreatedEvents(provider, chain = 'POLYGON') {
   );
 }
 
-// Fetch tickets owned by user
+// Fetch user tickets
 export async function fetchUserTickets(address, provider, chain = 'POLYGON') {
   const cfg = CHAINS[chain.toUpperCase()];
-  if (!cfg) throw new Error(`Unsupported chain: ${chain}`);
-
   const ticketNFT = getTicketNFTContract(provider, chain);
   const iface = new Interface(TicketNFTJson.abi);
 

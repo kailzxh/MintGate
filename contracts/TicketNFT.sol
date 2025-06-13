@@ -7,21 +7,15 @@ import "./EventFactory.sol";
 
 contract TicketNFT is ERC721Enumerable, Ownable {
     uint256 private _tokenIds;
+
     event TicketBurned(uint256 indexed tokenId, uint256 indexed eventId, address indexed owner);
     event TicketMinted(uint256 indexed tokenId, address indexed attendee, uint256 indexed eventId);
     event TicketUsed(uint256 indexed tokenId, uint256 indexed eventId, address indexed owner);
-    event TicketsConverted(uint256 indexed eventId, address indexed attendee, uint256 amountConverted, uint256 remainingERC1155Balance); // <== ADD THIS
-
-    
+    event TicketsConverted(uint256 indexed eventId, address indexed attendee, uint256 amountConverted, uint256 remainingERC1155Balance);
 
     EventFactory public eventFactory;
 
-    struct Ticket {
-        uint256 eventId;
-        string ipfsCID;
-        bool used;
-    }
-
+    struct Ticket { uint256 eventId; string ipfsCID; bool used; }
     mapping(uint256 => Ticket) public tickets;
 
     constructor(address eventFactoryAddress) ERC721("Event Ticket", "TICKET") Ownable() {
@@ -29,29 +23,15 @@ contract TicketNFT is ERC721Enumerable, Ownable {
     }
 
     address public minter;
-
-    modifier onlyMinter() {
-        require(msg.sender == minter, "Not authorized to mint");
-        _;
-    }
-
-    function setMinter(address _minter) external onlyOwner {
-        minter = _minter;
-    }
+    modifier onlyMinter() { require(msg.sender == minter, "Not authorized"); _; }
+    function setMinter(address m) external onlyOwner { minter = m; }
 
     function mintTicket(address attendee, uint256 eventId, string memory ipfsCID) external onlyMinter {
-    require(eventFactory.isValidEvent(eventId), "Invalid or expired event");
-    uint256 tokenId = _tokenIds;
-    _tokenIds += 1;
-    tickets[tokenId] = Ticket({
-        eventId: eventId,
-        ipfsCID: ipfsCID,
-        used: false
-    });
-
-    _mint(attendee, tokenId);
-
-    emit TicketMinted(tokenId, attendee, eventId);
+        require(eventFactory.isValidEvent(eventId), "Invalid/expired event");
+        uint256 tokenId = _tokenIds++;
+        tickets[tokenId] = Ticket(eventId, ipfsCID, false);
+        _mint(attendee, tokenId);
+        emit TicketMinted(tokenId, attendee, eventId);
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
