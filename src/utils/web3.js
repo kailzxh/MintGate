@@ -243,7 +243,7 @@ export async function fetchCreatedEvents(provider, chain = 'POLYGON') {
 
       return {
         id: eventId,
-        title: ev.name,
+        name: ev.name,
         date: new Date(Number(ev.date) * 1000).toISOString().split('T')[0],
         chain: chain.toLowerCase(),
         price: ethers.formatEther(ev.pricePerTicket),

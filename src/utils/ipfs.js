@@ -48,6 +48,50 @@ export async function uploadToIPFS(data, folder = 'folder', filename = 'metadata
 }
 
 /**
+ * Upload event image and nested metadata to IPFS.
+ * Returns:
+ * - eventCID: main metadata CID
+ * - imageCID: raw image CID
+ * - imageMetaCID: JSON with image IPFS path
+ * - urls: { image, imageMetadata, eventMetadata }
+ */
+export async function uploadEventWithNestedImage(imageFile, eventMetadata) {
+  // Step 1: Upload image
+  const imageUpload = await uploadToIPFS(imageFile, 'event', imageFile.name || 'image.png');
+  const imageCID = imageUpload.cid;
+  const imageURL = imageUpload.url;
+  const imageName = imageFile.name || 'image.png';
+  const imageIpfsPath = `ipfs://${imageCID}/${imageName}`;
+
+  // Step 2: Upload image metadata
+  const imageMetaData = { image: imageIpfsPath };
+  const imageMetaUpload = await uploadToIPFS(imageMetaData, 'event', 'metadata.json');
+  const imageMetaCID = imageMetaUpload.cid;
+  const imageMetaURL = imageMetaUpload.url;
+
+  // Step 3: Final event metadata with image
+  const fullMetadata = {
+    ...eventMetadata,
+    image: imageIpfsPath,
+    imageMeta: `ipfs://${imageMetaCID}/metadata.json`,
+  };
+  const eventMetaUpload = await uploadToIPFS(fullMetadata, 'event', 'metadata.json');
+  const eventCID = eventMetaUpload.cid;
+  const eventMetaURL = eventMetaUpload.url;
+
+  return {
+    eventCID,
+    imageCID,
+    imageMetaCID,
+    urls: {
+      image: imageURL,
+      imageMetadata: imageMetaURL,
+      eventMetadata: eventMetaURL,
+    },
+  };
+}
+
+/**
  * Fetch a JSON file from IPFS by CID and filename.
  * Default filename = metadata.json
  */
