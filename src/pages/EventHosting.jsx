@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { connectWallet, createEvent, CHAINS } from '../utils/web3';
+import { connectWallet,getTicketNFTContract ,approveTicketNFTIfNeeded, createEvent, CHAINS } from '../utils/web3';
+
 
 function EventHosting() {
   const navigate = useNavigate();
@@ -16,66 +17,77 @@ function EventHosting() {
   });
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const { title, date, price, totalTickets, description, imageFile } = formData;
-    const priceValue = parseFloat(price);
-    const ticketCount = parseInt(totalTickets, 10);
+  // const CONTRACTS = {
+  // polygon: {
+  //   factory: '0x6663E0B519DFA7c5533f179ed1C65E51530778eB',
+  //   ticketNFT: '0x96ceb02BeE989e5970fa33e0e414bDE2216ace19',
+  // },
+  // ethereum: {
+  //   factory: '0x6663E0B519DFA7c5533f179ed1C65E51530778eB',
+  //   ticketNFT: '0x96ceb02BeE989e5970fa33e0e414bDE2216ace19',
+  // },
+  // };
 
-    if (
-      !title ||
-      !description ||
-      !imageFile ||
-      isNaN(priceValue) || priceValue <= 0 ||
-      isNaN(ticketCount) || ticketCount <= 0
-    ) {
-      alert('Please fill in all fields with valid values.');
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  const { title, date, price, totalTickets, description, imageFile } = formData;
+  const priceValue = parseFloat(price);
+  const ticketCount = parseInt(totalTickets, 10);
+
+  if (
+    !title ||
+    !description ||
+    !imageFile ||
+    isNaN(priceValue) || priceValue <= 0 ||
+    isNaN(ticketCount) || ticketCount <= 0
+  ) {
+    alert('Please fill in all fields with valid values.');
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const signer = await connectWallet();
+    const rawChainId = window.ethereum.chainId;
+    const chainId = parseInt(rawChainId, 16);
+
+    let chainKey;
+    if (chainId === 80002) {
+      chainKey = 'polygon';
+    } else if (chainId === CHAINS.ETHEREUM.id) {
+      chainKey = 'ethereum';
+    } else {
+      alert(`Unsupported network (chainId=${chainId}). Please switch to Polygon or Ethereum.`);
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-    try {
-      // 1. Connect wallet & detect network
-      const signer = await connectWallet();
-    // MetaMask injects chainId as a hex string (e.g. "0x1388"), so parse that:
-     const rawChainId = window.ethereum.chainId; 
-     console.log(rawChainId);
-     
-    const chainId = parseInt(rawChainId, 16);
-    console.log(chainId);
+    // const factoryAddress = CONTRACTS[chainKey].factory;
 
+    // Create event
+    const result = await createEvent(signer, {
+      name: title,
+      description,
+      date,
+      chain: chainKey,
+      maxTickets: ticketCount,
+      imageFile,
+      price: priceValue,
+    });
 
-      let chainKey;
-      if (chainId === 80002) {
-        chainKey = 'Polygon';
-      } else if (chainId === CHAINS.ETHEREUM.id) {
-        chainKey = 'ethereum';
-      } else {
-        alert(`Unsupported network (chainId=${chainId}). Please switch to Polygon or Ethereum.`);
-        setLoading(false);
-        return;
-      }
+    alert(`✅ Event created!\nTX Hash: ${result.transactionHash}`);
 
-      // 2. Call your shared createEvent util
-      const result = await createEvent(signer, {
-        name: title,
-        description,
-        date,
-        chain: chainKey,
-        maxTickets: ticketCount,
-        imageFile,
-        price: priceValue,
-      });
+    await approveTicketNFTIfNeeded(signer,);
 
-      alert(`✅ Event created!\nTX Hash: ${result.transactionHash}`);
-      navigate('/');
-    } catch (err) {
-      console.error(err);
-      alert(`❌ ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+    
+  } catch (err) {
+    console.error(err);
+    alert(`❌ ${err.reason || err.message || 'Event creation failed.'}`);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="max-w-2xl mx-auto p-4">

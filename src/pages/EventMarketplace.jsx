@@ -193,6 +193,8 @@ function EventMarketplace() {
             dateObj: new Date(parsedDate),
             remaining: Number(event.remaining ?? 0),       // ✅ fixed
             totalTickets: Number(event.totalTickets ?? 0),
+            ipfsCID: event.ipfsCID,     // pass through metadata CID
+            imageCID: event.imageCID,
           };
         })
         .filter((event) => event.dateObj.getTime() > now);

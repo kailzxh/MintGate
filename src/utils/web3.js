@@ -1,5 +1,4 @@
-import { ethers, Interface, parseEther } from 'ethers'
-
+import { ethers, Interface, parseEther } from 'ethers';
 import EventFactoryJson from '../../artifacts/contracts/EventFactory.sol/EventFactory.json';
 import TicketNFTJson from '../../artifacts/contracts/TicketNFT.sol/TicketNFT.json';
 import { uploadToIPFS, getFromIPFS, IPFS_GATEWAY } from './ipfs';
@@ -37,14 +36,25 @@ export async function connectWallet() {
 export function getEventFactoryContract(signerOrProvider, chain = 'POLYGON') {
   const cfg = CHAINS[chain.toUpperCase()];
   if (!cfg) throw new Error(`Unsupported chain: ${chain}`);
-  return new ethers.Contract(cfg.contracts.eventFactory, EventFactoryJson.abi, signerOrProvider);
+
+  // Sometimes env‑var strings include "KEY=0x…". Split and grab only the hex.
+  let raw = cfg.contracts.eventFactory;
+  if (raw.includes('=')) raw = raw.split('=').pop().trim();
+
+  const factoryAddr = ethers.getAddress(raw);
+  return new ethers.Contract(factoryAddr, EventFactoryJson.abi, signerOrProvider);
 }
 
 export function getTicketNFTContract(signerOrProvider, chain = 'POLYGON') {
   const cfg = CHAINS[chain.toUpperCase()];
   if (!cfg) throw new Error(`Unsupported chain: ${chain}`);
-  return new ethers.Contract(cfg.contracts.ticketNFT, TicketNFTJson.abi, signerOrProvider);
-}
+
+  // Strip off any "KEY=" prefix and use only the hex
+  let raw = cfg.contracts.ticketNFT;
+  if (raw.includes('=')) raw = raw.split('=').pop().trim();
+
+  const nftAddr = ethers.getAddress(raw);
+  return new ethers.Contract(nftAddr, TicketNFTJson.abi, signerOrProvider);}
 
 // Create a new event
 export async function createEvent(signer, details) {
@@ -185,95 +195,132 @@ export async function createEvent(signer, details) {
 }
 
 // Purchase ticket
-export async function purchaseTicket(signer, eventId, chain) {
-  const cfg = CHAINS[chain.toUpperCase()];
-  if (!cfg) throw new Error(`Unsupported chain: ${chain}`);
 
+
+
+export async function purchaseTicket(
+  signer,
+  eventId,
+  chain,
+  quantity = 1
+) {
+  if (quantity < 1) {
+    throw new Error('Quantity must be at least 1');
+  }
+
+  // 1) Buy ERC-1155 tickets from EventFactory
   const factory = getEventFactoryContract(signer, chain);
+  const ev = await factory.events(eventId);
+  // ev.pricePerTicket is a BigInt in ethers v6
+  const pricePerTicket = ev.pricePerTicket;
+  const totalPrice = pricePerTicket * BigInt(quantity);
+
+  const tx1 = await factory.purchaseTicket(eventId, quantity, {
+    value: totalPrice
+  });
+  await tx1.wait();
+
+  // 2) Convert ERC-1155 into ERC-721 via TicketNFT
   const ticketNFT = getTicketNFTContract(signer, chain);
+  await approveTicketNFTIfNeeded(signer, chain);
+  const tx2 = await ticketNFT.mintTicketsFromFactory(eventId, quantity);
+  const receipt2 = await tx2.wait();
 
-  const details = await factory.events(eventId);
-  const ipfsCID = details.ipfsCID;
-
-  const tx = await ticketNFT.mintTicket(await signer.getAddress(), eventId, ipfsCID);
-  const receipt = await tx.wait();
-
+  // 3) Parse TicketMinted logs
   const iface = new Interface(TicketNFTJson.abi);
-  for (const log of receipt.logs) {
+  const results = [];
+
+  for (const log of receipt2.logs) {
     try {
       const parsed = iface.parseLog(log);
       if (parsed.name === 'TicketMinted') {
-        return {
+        results.push({
           tokenId: parsed.args.tokenId.toString(),
-          transactionHash: receipt.transactionHash,
-        };
+          transactionHash: receipt2.transactionHash
+        });
       }
-    } catch {}
+    } catch {
+      // ignore non-TicketMinted logs
+    }
   }
 
-  throw new Error('TicketMinted event not found in logs');
+  if (results.length === 0) {
+    throw new Error('No TicketMinted events found after conversion');
+  }
+
+  // Return single object or array
+  return quantity === 1 ? results[0] : results;
 }
+
+
+
+
+
 
 // Fetch created events
 export async function fetchCreatedEvents(provider, chain = 'POLYGON') {
   const cfg = CHAINS[chain.toUpperCase()];
-  const factoryAddr = cfg.contracts.eventFactory;
+  const factoryAddr = ethers.getAddress(cfg.contracts.eventFactory);
   const iface = new Interface(EventFactoryJson.abi);
+
   const filter = {
     address: factoryAddr,
-    topics: [ethers.id('EventCreated(uint256,address,string,string)')],
+    topics:  [ethers.id('EventCreated(uint256,address,string,string)')],
     fromBlock: 20212544,
-    toBlock: 'latest',
+    toBlock:   'latest',
   };
 
   const logs = await provider.getLogs(filter);
-  return Promise.all(
+  const events = await Promise.all(
     logs.map(async (log) => {
       try {
         const decoded = iface.decodeEventLog('EventCreated', log.data, log.topics);
-        const eventId = decoded.eventId.toString();
-        const ipfsCID = decoded.ipfsCID;
+        const eventId     = decoded.eventId.toString();
+        const metadataCID = decoded.ipfsCID;
+        const imageCID    = decoded.imageCID;
 
         const contract = new ethers.Contract(factoryAddr, EventFactoryJson.abi, provider);
-        const ev = await contract.getEventDetails(eventId);
+        const ev       = await contract.getEventDetails(eventId);
 
         let metadata = {};
         try {
-          metadata = await getFromIPFS(ipfsCID, 'metadata.json');
+          metadata = await getFromIPFS(metadataCID, 'metadata.json');
         } catch (err) {
           console.warn(`Failed to fetch metadata for ${eventId}:`, err);
         }
 
-        // Safe parsing of remaining tickets
         const ticketsRemaining = Number(ev.ticketsRemaining ?? 0);
-        const totalTickets = metadata.ticketCount != null? Number(metadata.ticketCount):ticketsRemaining;
+        const totalTickets     = metadata.ticketCount != null
+          ? Number(metadata.ticketCount)
+          : ticketsRemaining;
 
+        const image = metadata.image
+          ? metadata.image.replace('ipfs://', `${IPFS_GATEWAY}/`)
+          : `${IPFS_GATEWAY}/${imageCID}/image.png`;
 
-        const pricePerTicket = ev.pricePerTicket?.toString?.() ?? ev.pricePerTicket;
-
-        
-     
-        
         return {
-          id: eventId,
-          name: ev.name,
-          date: new Date(Number(ev.date) * 1000).toISOString().split('T')[0],
-          chain: chain.toLowerCase(),
-          price: ethers.formatEther(pricePerTicket),
-          remaining: Number(ticketsRemaining),
-          totalTickets: Number(totalTickets),
-          image: metadata.image
-            ? metadata.image.replace('ipfs://', `${IPFS_GATEWAY}/`)
-            : `${IPFS_GATEWAY}/${ipfsCID}/image.png`,
+          id:           eventId,
+          name:         ev.name,
+          date:         new Date(Number(ev.date) * 1000).toISOString().split('T')[0],
+          chain:        chain.toLowerCase(),
+          price:        ethers.formatEther(ev.pricePerTicket.toString()),
+          remaining:    ticketsRemaining,
+          totalTickets,
+          ipfsCID:      metadataCID,
+          imageCID,
+          image,
         };
-       
       } catch (err) {
-        console.error('Failed to decode log or fetch event details:', err);
+        console.error('Failed to decode log or fetch details:', err);
         return null;
       }
     })
-  ).then(events => events.filter(Boolean)); // filter out nulls
+  );
+
+  return events.filter(Boolean);
 }
+
+
 
 
 // Fetch user tickets
@@ -311,3 +358,33 @@ export async function fetchUserTickets(address, provider, chain = 'POLYGON') {
     })
   );
 }
+
+
+
+
+
+
+
+export async function approveTicketNFTIfNeeded(signer, chain = 'POLYGON') {
+  const userAddress = await signer.getAddress();
+
+  // ✅ Use EventFactory as the ERC-1155 contract
+  const eventFactory = getEventFactoryContract(signer, chain);
+  const ticketNFTAddress = getTicketNFTContract(signer, chain).target;
+
+  const isApproved = await eventFactory.isApprovedForAll(userAddress, ticketNFTAddress);
+
+  if (!isApproved) {
+    const tx = await eventFactory.setApprovalForAll(ticketNFTAddress, true);
+    await tx.wait();
+    console.log(`✅ Approved TicketNFT contract to manage your ERC-1155 tickets`);
+  } else {
+    console.log(`ℹ️ TicketNFT already approved`);
+  }
+}
+
+
+
+
+
+
