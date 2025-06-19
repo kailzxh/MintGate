@@ -229,32 +229,52 @@ export async function fetchCreatedEvents(provider, chain = 'POLYGON') {
   const logs = await provider.getLogs(filter);
   return Promise.all(
     logs.map(async (log) => {
-      const decoded = iface.decodeEventLog('EventCreated', log.data, log.topics);
-      const eventId = decoded.eventId.toString();
-      const ipfsCID = decoded.ipfsCID;
-
-      const contract = new ethers.Contract(factoryAddr, EventFactoryJson.abi, provider);
-      const ev = await contract.getEventDetails(eventId);
-
-      let metadata = {};
       try {
-        metadata = await getFromIPFS(ipfsCID, 'metadata.json');
-      } catch {}
+        const decoded = iface.decodeEventLog('EventCreated', log.data, log.topics);
+        const eventId = decoded.eventId.toString();
+        const ipfsCID = decoded.ipfsCID;
 
-      return {
-        id: eventId,
-        name: ev.name,
-        date: new Date(Number(ev.date) * 1000).toISOString().split('T')[0],
-        chain: chain.toLowerCase(),
-        price: ethers.formatEther(ev.pricePerTicket),
-        remaining: ev.ticketsRemaining.toString(),
-        image: metadata.image
-          ? metadata.image.replace('ipfs://', `${IPFS_GATEWAY}/`)
-          : `${IPFS_GATEWAY}/${ipfsCID}/image.png`,
-      };
+        const contract = new ethers.Contract(factoryAddr, EventFactoryJson.abi, provider);
+        const ev = await contract.getEventDetails(eventId);
+
+        let metadata = {};
+        try {
+          metadata = await getFromIPFS(ipfsCID, 'metadata.json');
+        } catch (err) {
+          console.warn(`Failed to fetch metadata for ${eventId}:`, err);
+        }
+
+        // Safe parsing of remaining tickets
+        const ticketsRemaining = Number(ev.ticketsRemaining ?? 0);
+        const totalTickets = metadata.ticketCount != null? Number(metadata.ticketCount):ticketsRemaining;
+
+
+        const pricePerTicket = ev.pricePerTicket?.toString?.() ?? ev.pricePerTicket;
+
+        
+     
+        
+        return {
+          id: eventId,
+          name: ev.name,
+          date: new Date(Number(ev.date) * 1000).toISOString().split('T')[0],
+          chain: chain.toLowerCase(),
+          price: ethers.formatEther(pricePerTicket),
+          remaining: Number(ticketsRemaining),
+          totalTickets: Number(totalTickets),
+          image: metadata.image
+            ? metadata.image.replace('ipfs://', `${IPFS_GATEWAY}/`)
+            : `${IPFS_GATEWAY}/${ipfsCID}/image.png`,
+        };
+       
+      } catch (err) {
+        console.error('Failed to decode log or fetch event details:', err);
+        return null;
+      }
     })
-  );
+  ).then(events => events.filter(Boolean)); // filter out nulls
 }
+
 
 // Fetch user tickets
 export async function fetchUserTickets(address, provider, chain = 'POLYGON') {

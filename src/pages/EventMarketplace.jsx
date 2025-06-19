@@ -190,7 +190,9 @@ function EventMarketplace() {
             price: parseFloat(event.price) || 0,
             chain: event.chain || 'Polygon',
             date: parsedDate,
-            dateObj: new Date(parsedDate)
+            dateObj: new Date(parsedDate),
+            remaining: Number(event.remaining ?? 0),       // ✅ fixed
+            totalTickets: Number(event.totalTickets ?? 0),
           };
         })
         .filter((event) => event.dateObj.getTime() > now);
