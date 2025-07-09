@@ -1,4 +1,4 @@
-// scripts/deploy.js
+// scripts/deploy.cjs
 const hre = require("hardhat");
 
 async function main() {
@@ -7,52 +7,52 @@ async function main() {
 
   console.log("Deploying contracts with account:", deployer.address);
 
-  // 1) Deploy EventFactory
+  // 1) Deploy EventFactory first
   const EventFactory = await ethers.getContractFactory("EventFactory");
   const eventFactory = await EventFactory.deploy();
   await eventFactory.waitForDeployment();
   console.log("  ↳ EventFactory:", eventFactory.target);
 
-  // 2) Deploy TicketNFT and point it at EventFactory
+  // 2) Deploy TicketNFT with EventFactory address
   const TicketNFT = await ethers.getContractFactory("TicketNFT");
   const ticketNFT = await TicketNFT.deploy(eventFactory.target);
   await ticketNFT.waitForDeployment();
   console.log("  ↳ TicketNFT:", ticketNFT.target);
 
-  // 3) Wire them up:
-  //
-  //   • EventFactory needs to know who its TicketNFT is (so it can burn ERC1155 tokens)
-  //   • TicketNFT needs to know who its minter is
-  console.log("Wiring EventFactory ⇄ TicketNFT...");
-  await (await eventFactory.setTicketNFTContract(ticketNFT.target)).wait();
-  await (await ticketNFT.setMinter(eventFactory.target)).wait();
+  // 3) Transfer ownership of TicketNFT to EventFactory
+  console.log("Transferring ownership of TicketNFT to EventFactory...");
+  await (await ticketNFT.transferOwnership(eventFactory.target)).wait();
 
-  // 4) Deploy POAPDistributor pointing at TicketNFT
+  // 4) Set TicketNFT address inside EventFactory
+  console.log("Setting TicketNFT in EventFactory...");
+  await (await eventFactory.setTicketNFTContract(ticketNFT.target)).wait();
+
+  // 5) Deploy POAPDistributor
   const POAPDistributor = await ethers.getContractFactory("POAPDistributor");
   const poapDistributor = await POAPDistributor.deploy(ticketNFT.target);
   await poapDistributor.waitForDeployment();
   console.log("  ↳ POAPDistributor:", poapDistributor.target);
 
-  // 5) Deploy CrossChainVerifier (if you have one)
+  // 6) Deploy CrossChainVerifier
   const CrossChainVerifier = await ethers.getContractFactory("CrossChainVerifier");
   const crossChainVerifier = await CrossChainVerifier.deploy();
   await crossChainVerifier.waitForDeployment();
   console.log("  ↳ CrossChainVerifier:", crossChainVerifier.target);
 
-  // 6) (Optional) set up any cross-chain mappings
-  //    e.g. if on Polygon (chainId 137) you want to be able to verify TicketNFTs:
+  // 7) Set ticketNFT mapping for Polygon
   await (await crossChainVerifier.setChainTicketContract(
-    /* chainId: */ 137,
+    137,
     ticketNFT.target
   )).wait();
 
-  console.log("\nDeployment complete!");
-  console.log("  • EventFactory       :", eventFactory.target);
+  // Summary
+  console.log("\n✅ Deployment complete!");
   console.log("  • TicketNFT          :", ticketNFT.target);
+  console.log("  • EventFactory       :", eventFactory.target);
   console.log("  • POAPDistributor    :", poapDistributor.target);
-  console.log("  • CrossChainVerifier:", crossChainVerifier.target);
+  console.log("  • CrossChainVerifier :", crossChainVerifier.target);
 
-  // 7) (Optional) verify on Etherscan if you have an ETHERSCAN_API_KEY
+  // Optional: Verify on Etherscan
   if (process.env.ETHERSCAN_API_KEY) {
     console.log("\n🔍 Verifying contracts on Etherscan...");
     await hre.run("verify:verify", {
@@ -77,6 +77,6 @@ async function main() {
 main()
   .then(() => process.exit(0))
   .catch((err) => {
-    console.error(err);
+    console.error("Deployment failed:", err);
     process.exit(1);
   });

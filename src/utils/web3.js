@@ -363,28 +363,33 @@ export async function fetchUserTickets(address, provider, chain = 'POLYGON') {
 
 
 
+// export async function approveTicketNFTIfNeeded(signer, chain = 'polygon') {
+//   const userAddress = await signer.getAddress();
 
+//   const ticketNFTContract = getTicketNFTContract(signer, chain);
+//   const eventFactoryContract = getEventFactoryContract(signer, chain);
 
-export async function approveTicketNFTIfNeeded(signer, chain = 'POLYGON') {
-  const userAddress = await signer.getAddress();
+//   const ticketNFTAddress = ticketNFTContract.target;
+//   const eventFactoryAddress = eventFactoryContract.target;
 
-  // ✅ Use EventFactory as the ERC-1155 contract
-  const eventFactory = getEventFactoryContract(signer, chain);
-  const ticketNFTAddress = getTicketNFTContract(signer, chain).target;
+//   const ERC1155_ABI = [
+//     "function setApprovalForAll(address operator, bool approved) external",
+//     "function isApprovedForAll(address owner, address operator) external view returns (bool)"
+//   ];
 
-  const isApproved = await eventFactory.isApprovedForAll(userAddress, ticketNFTAddress);
+//   const erc1155 = new ethers.Contract(ticketNFTAddress, ERC1155_ABI, signer);
 
-  if (!isApproved) {
-    const tx = await eventFactory.setApprovalForAll(ticketNFTAddress, true);
-    await tx.wait();
-    console.log(`✅ Approved TicketNFT contract to manage your ERC-1155 tickets`);
-  } else {
-    console.log(`ℹ️ TicketNFT already approved`);
-  }
-}
-
-
-
-
-
-
+//   try {
+//     const isApproved = await erc1155.isApprovedForAll(userAddress, eventFactoryAddress);
+//     if (!isApproved) {
+//       const tx = await erc1155.setApprovalForAll(eventFactoryAddress, true);
+//       await tx.wait();
+//       console.log(`✅ Approved EventFactory (${eventFactoryAddress}) to manage your ERC-1155 tickets`);
+//     } else {
+//       console.log(`ℹ️ EventFactory is already approved to manage your tickets`);
+//     }
+//   } catch (err) {
+//     console.error('❌ Approval check or transaction failed:', err);
+//     throw err;
+//   }
+// }

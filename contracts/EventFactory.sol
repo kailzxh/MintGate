@@ -2,13 +2,16 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "./TicketNFT.sol";
 
-contract EventFactory is ERC1155, Ownable {
+contract EventFactory is ERC1155, Ownable, IERC1155Receiver {
     using Counters for Counters.Counter;
     Counters.Counter private _eventIds;
-    address public ticketNFTContract;
+
+    TicketNFT public ticketNFT;
 
     struct Event {
         string name;
@@ -23,10 +26,14 @@ contract EventFactory is ERC1155, Ownable {
     mapping(uint256 => Event) public events;
 
     event EventCreated(uint256 indexed eventId, address indexed owner, string ipfsCID, string imageCID);
-    /// @dev Debug event so you can see on-chain timestamp vs input date
+    event TicketPurchased(uint256 indexed eventId, address indexed buyer, uint256 amount);
     event DebugTimestamps(uint256 nowTime, uint256 inputDate);
 
     constructor() ERC1155("ipfs://") Ownable() {}
+
+    function setTicketNFTContract(address _ticketNFT) external onlyOwner {
+        ticketNFT = TicketNFT(_ticketNFT);
+    }
 
     function createEvent(
         string memory name,
@@ -36,10 +43,7 @@ contract EventFactory is ERC1155, Ownable {
         uint256 maxTickets,
         uint256 pricePerTicket
     ) external returns (uint256) {
-        // DEBUG: show block.timestamp vs date
         emit DebugTimestamps(block.timestamp, date);
-
-        // require date >= now (relaxed from >)
         require(date >= block.timestamp, "Event date must be >= now");
         require(bytes(ipfsCID).length > 0, "IPFS CID required");
         require(bytes(imageCID).length > 0, "Image CID required");
@@ -58,10 +62,8 @@ contract EventFactory is ERC1155, Ownable {
             pricePerTicket: pricePerTicket
         });
 
-        // auto-approve this contract to move tokens on behalf of owner
-        _setApprovalForAll(msg.sender, address(this), true);
-
-        _mint(msg.sender, eventId, maxTickets, "");
+        // Mint all tickets to the EventFactory itself
+        _mint(address(this), eventId, maxTickets, "");
 
         emit EventCreated(eventId, msg.sender, ipfsCID, imageCID);
         return eventId;
@@ -75,8 +77,6 @@ contract EventFactory is ERC1155, Ownable {
         return events[eventId].active && events[eventId].date > block.timestamp;
     }
 
-    event TicketPurchased(uint256 indexed eventId, address indexed buyer, uint256 amount);
-
     function purchaseTicket(uint256 eventId, uint256 amount) external payable {
         Event storage evt = events[eventId];
         require(evt.active, "Event not active");
@@ -85,15 +85,22 @@ contract EventFactory is ERC1155, Ownable {
         uint256 totalPrice = evt.pricePerTicket * amount;
         require(msg.value >= totalPrice, "Insufficient payment");
 
-        uint256 bal = balanceOf(evt.owner, eventId);
-        require(bal >= amount, "Not enough tickets");
+        uint256 factoryBalance = balanceOf(address(this), eventId);
+        require(factoryBalance >= amount, "Not enough tickets");
 
-        // no need to call setApprovalForAll—owner was auto-approved in createEvent
-        safeTransferFrom(evt.owner, msg.sender, eventId, amount, "");
+        // Burn ERC-1155 tickets from EventFactory
+        _burn(address(this), eventId, amount);
 
+        // Mint ERC-721 tickets to buyer
+        for (uint256 i = 0; i < amount; i++) {
+            ticketNFT.mintTicket(msg.sender, eventId, evt.ipfsCID);
+        }
+
+        // Payout to event creator
         (bool sent,) = payable(evt.owner).call{value: totalPrice}("");
         require(sent, "Payout failed");
 
+        // Refund extra if any
         if (msg.value > totalPrice) {
             (bool refund,) = payable(msg.sender).call{value: msg.value - totalPrice}("");
             require(refund, "Refund failed");
@@ -111,7 +118,7 @@ contract EventFactory is ERC1155, Ownable {
         string memory name,
         uint256 date,
         string memory ipfsCID,
-        string memory imageCID,   
+        string memory imageCID,
         address owner,
         bool active,
         uint256 pricePerTicket,
@@ -122,24 +129,47 @@ contract EventFactory is ERC1155, Ownable {
             evt.name,
             evt.date,
             evt.ipfsCID,
-            evt.imageCID,     
+            evt.imageCID,
             evt.owner,
             evt.active,
             evt.pricePerTicket,
-            balanceOf(evt.owner, eventId)
+            balanceOf(address(this), eventId)
         );
-    }
-
-    function setTicketNFTContract(address _ticketNFT) external onlyOwner {
-        ticketNFTContract = _ticketNFT;
-    }
-
-    function burn(address from, uint256 eventId, uint256 amount) external {
-        require(msg.sender == ticketNFTContract, "Only TicketNFT can burn");
-        _burn(from, eventId, amount);
     }
 
     function ticketBalanceOf(address user, uint256 eventId) external view returns (uint256) {
         return balanceOf(user, eventId);
+    }
+
+    // ========== IERC1155Receiver ==========
+
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return this.onERC1155Received.selector;
+    }
+
+    function onERC1155BatchReceived(
+        address,
+        address,
+        uint256[] calldata,
+        uint256[] calldata,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return this.onERC1155BatchReceived.selector;
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(ERC1155, IERC165)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId) || interfaceId == type(IERC1155Receiver).interfaceId;
     }
 }

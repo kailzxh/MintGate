@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { connectWallet,getTicketNFTContract ,approveTicketNFTIfNeeded, createEvent, CHAINS } from '../utils/web3';
+import { connectWallet,getTicketNFTContract , createEvent, CHAINS } from '../utils/web3';
 
 
 function EventHosting() {
@@ -16,17 +16,6 @@ function EventHosting() {
     imageFile: null,
   });
   const [loading, setLoading] = useState(false);
-
-  // const CONTRACTS = {
-  // polygon: {
-  //   factory: '0x6663E0B519DFA7c5533f179ed1C65E51530778eB',
-  //   ticketNFT: '0x96ceb02BeE989e5970fa33e0e414bDE2216ace19',
-  // },
-  // ethereum: {
-  //   factory: '0x6663E0B519DFA7c5533f179ed1C65E51530778eB',
-  //   ticketNFT: '0x96ceb02BeE989e5970fa33e0e414bDE2216ace19',
-  // },
-  // };
 
   const handleSubmit = async (e) => {
   e.preventDefault();
@@ -77,7 +66,8 @@ function EventHosting() {
 
     alert(`✅ Event created!\nTX Hash: ${result.transactionHash}`);
 
-    await approveTicketNFTIfNeeded(signer,);
+//    await approveTicketNFTIfNeeded(signer); // approve TicketNFT to manage 1155
+// await getTicketNFTContract.mintTicketsFromFactory(eventId, amount); 
 
     
   } catch (err) {
