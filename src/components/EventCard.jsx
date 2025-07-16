@@ -5,7 +5,7 @@ import { isAddress } from 'ethers';
 import { ThemeContext } from '../contexts/ThemeContext'; // assumes you have a ThemeContext
 
 const IPFS_GATEWAYS = [
-  'https://gateway.pinata.cloud/ipfs',
+  
   'https://ipfs.io/ipfs',
   'https://cloudflare-ipfs.com/ipfs'
 ];
@@ -78,6 +78,11 @@ function EventCard({ event, onRefresh }) {
     totalTickets,
     ipfsCID,
     imageCID,
+    imageMetaURL,
+    imageMetaCID,
+    eventCID,
+    fileCID,
+    eventMetaFileCID,
   } = event;
 
   const [quantity, setQuantity] = useState(1);
@@ -185,14 +190,14 @@ function EventCard({ event, onRefresh }) {
   };
 
   const maxQty = Math.max(0, remainingCount);
-
+  console.log(imageMetaCID);
   return (
     <div
       className={`flex flex-col overflow-hidden rounded-3xl ${styles.blur} ${styles.cardBg} ${styles.border} ${styles.shadow} ${styles.shadowHover} transition-shadow duration-300`}
     >
       <div className="relative h-48 w-full">
         <img
-          src={imgSrc || fallbackImage}
+          src={imageMetaCID}
           alt={name}
           onError={() => setImgSrc(fallbackImage)}
           className="w-full h-full object-cover"

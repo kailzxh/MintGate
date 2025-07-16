@@ -63,12 +63,8 @@ function EventHosting() {
       imageFile,
       price: priceValue,
     });
-
+    console.log(result);
     alert(`✅ Event created!\nTX Hash: ${result.transactionHash}`);
-
-//    await approveTicketNFTIfNeeded(signer); // approve TicketNFT to manage 1155
-// await getTicketNFTContract.mintTicketsFromFactory(eventId, amount); 
-
     
   } catch (err) {
     console.error(err);

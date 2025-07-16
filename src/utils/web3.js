@@ -179,7 +179,7 @@ export async function createEvent(signer, details) {
           eventId: parsed.args.eventId.toString(),
           ipfsCID: metadataCID.toString(),
           imageCID: imageCID.toString(),
-          transactionHash: receipt.transactionHash,
+          transactionHash: tx.hash,
         };
       }
     } catch (err) {
