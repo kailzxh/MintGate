@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Slider from "react-slick";
-import axios from "axios";
-import TicketCard from "./TicketCard"; // component to display ticket
-import EventCard from "./EventCard";   // component to display event
+import { connectWallet, fetchUserTickets, fetchCreatedEvents } from "../utils/web3";
+import TicketCard from "./TicketCard"; 
+import EventCard from "./EventCard";   
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
-import "./Profile.css"; // optional: for custom styling
 
 export default function Profile({ currentUser }) {
   const [tickets, setTickets] = useState([]);
@@ -25,45 +24,37 @@ export default function Profile({ currentUser }) {
     ]
   };
 
-  // Fetch purchased tickets
-  const fetchTickets = async () => {
+  const loadProfileData = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await axios.get(`/users/${currentUser.id}/tickets`);
-      setTickets(res.data);
-    } catch (err) {
-      console.error("Error fetching tickets:", err);
-    }
-  };
+      const signer = await connectWallet();
+      const provider = signer.provider;
+      const address = await signer.getAddress();
 
-  // Fetch hosted events
-  const fetchEvents = async () => {
-    try {
-      const res = await axios.get(`/users/${currentUser.id}/events`);
-      setEvents(res.data);
+      const userTickets = await fetchUserTickets(address, provider, "POLYGON");
+      setTickets(userTickets || []);
+
+      const userEvents = await fetchCreatedEvents(address, provider, "POLYGON");
+      setEvents(userEvents || []);
     } catch (err) {
-      console.error("Error fetching events:", err);
+      console.error("Error loading profile data:", err);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchTickets(), fetchEvents()]);
-      setLoading(false);
-    };
-    if (currentUser?.id) {
-      loadData();
-    }
-  }, [currentUser]);
+    loadProfileData();
+  }, [loadProfileData]);
 
   if (loading) return <div className="profile-loading">Loading profile...</div>;
 
   return (
     <div className="profile-container">
-      <h1>{currentUser.name}’s Profile</h1>
-      <p className="profile-email">{currentUser.email}</p>
+      <h1>{currentUser?.name || "User"}’s Profile</h1>
+      <p className="profile-email">{currentUser?.email}</p>
 
-      {/* Tab Navigation */}
+      {/* Tabs */}
       <div className="profile-tabs">
         <button
           className={activeTab === "tickets" ? "active" : ""}
@@ -79,13 +70,13 @@ export default function Profile({ currentUser }) {
         </button>
       </div>
 
-      {/* Tab Content */}
+      {/* Content */}
       <div className="profile-content">
         {activeTab === "tickets" && (
           tickets.length > 0 ? (
-            <div className="ticket-list">
+            <div className="ticket-list space-y-4">
               {tickets.map(ticket => (
-                <TicketCard key={ticket.id} ticket={ticket} />
+                <TicketCard key={ticket.tokenId} ticket={ticket} />
               ))}
             </div>
           ) : (
@@ -97,7 +88,9 @@ export default function Profile({ currentUser }) {
           events.length > 0 ? (
             <Slider {...carouselSettings}>
               {events.map(event => (
-                <EventCard key={event.id} event={event} />
+                <div key={event.id} className="p-2">
+                  <EventCard event={event} onRefresh={loadProfileData} />
+                </div>
               ))}
             </Slider>
           ) : (

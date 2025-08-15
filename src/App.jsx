@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Signup from './pages/SignUp';
 import EventMarketplace from './pages/EventMarketplace';
 import TicketManagement from './pages/TicketManagement';
+import Profile from './components/Profile';
 import EventHosting from './pages/EventHosting';
 import AuthPage from "./pages/AuthPage";
 
@@ -39,6 +40,15 @@ function AppRoutes() {
         element={
           
             <EventHosting />
+          
+        }
+      />
+
+       <Route
+        path="/profile"
+        element={
+          
+            <Profile />
           
         }
       />

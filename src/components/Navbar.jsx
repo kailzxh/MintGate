@@ -64,6 +64,9 @@ function Navbar() {
             <Link to="/host" className="text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">
               Host Event
             </Link>
+            <Link to="/profile" className="text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">
+              Profile
+            </Link>
           </div>
           <div className="flex items-center space-x-4">
             <button 
