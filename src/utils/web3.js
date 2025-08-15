@@ -393,3 +393,73 @@ export async function fetchUserTickets(address, provider, chain = 'POLYGON') {
 //     throw err;
 //   }
 // }
+// utils/web3.js
+
+// Fetch only events created by a specific owner
+// Fetch only events created by a specific owner
+export async function fetchOwnerEvents(ownerAddress, provider, chain = 'POLYGON') {
+  const cfg = CHAINS[chain.toUpperCase()];
+  const factoryAddr = ethers.getAddress(cfg.contracts.eventFactory);
+  const iface = new Interface(EventFactoryJson.abi);
+
+  const filter = {
+    address: factoryAddr,
+    topics: [
+      ethers.id('EventCreated(uint256,address,string,string)'), // event signature
+      null, // eventId (skip filter)
+      ethers.zeroPadValue(ownerAddress, 32) // only match this owner
+    ],
+    fromBlock: 25000000,
+    toBlock: 'latest'
+  };
+
+  const logs = await provider.getLogs(filter);
+
+  const events = await Promise.all(
+    logs.map(async (log) => {
+      try {
+        const decoded = iface.decodeEventLog('EventCreated', log.data, log.topics);
+        const eventId     = decoded.eventId.toString();
+        const metadataCID = decoded.ipfsCID;
+        const imageCID    = decoded.imageCID;
+
+        const contract = new ethers.Contract(factoryAddr, EventFactoryJson.abi, provider);
+        const ev       = await contract.getEventDetails(eventId);
+
+        let metadata = {};
+        try {
+          metadata = await getFromIPFS(metadataCID, 'metadata.json');
+        } catch (err) {
+          console.warn(`Failed to fetch metadata for ${eventId}:`, err);
+        }
+
+        const ticketsRemaining = Number(ev.ticketsRemaining ?? 0);
+        const totalTickets     = metadata.ticketCount != null
+          ? Number(metadata.ticketCount)
+          : ticketsRemaining;
+
+        const image = metadata.image
+          ? metadata.image.replace('ipfs://', `${IPFS_GATEWAY}/`)
+          : `${IPFS_GATEWAY}/${imageCID}/image.png`;
+
+        return {
+          id:           eventId,
+          name:         ev.name,
+          date:         new Date(Number(ev.date) * 1000).toISOString().split('T')[0],
+          chain:        chain.toLowerCase(),
+          price:        ethers.formatEther(ev.pricePerTicket.toString()),
+          remaining:    ticketsRemaining,
+          totalTickets,
+          ipfsCID:      metadataCID,
+          imageCID,
+          image,
+        };
+      } catch (err) {
+        console.error('Failed to decode log or fetch details:', err);
+        return null;
+      }
+    })
+  );
+
+  return events.filter(Boolean);
+}
