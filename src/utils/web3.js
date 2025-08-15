@@ -222,7 +222,7 @@ export async function purchaseTicket(
 
   // 2) Convert ERC-1155 into ERC-721 via TicketNFT
   const ticketNFT = getTicketNFTContract(signer, chain);
-  await approveTicketNFTIfNeeded(signer, chain);
+  // await approveTicketNFTIfNeeded(signer, chain);
   const tx2 = await ticketNFT.mintTicketsFromFactory(eventId, quantity);
   const receipt2 = await tx2.wait();
 
@@ -266,7 +266,7 @@ export async function fetchCreatedEvents(provider, chain = 'POLYGON') {
   const filter = {
     address: factoryAddr,
     topics:  [ethers.id('EventCreated(uint256,address,string,string)')],
-    fromBlock: 20212544,
+    fromBlock: 25000000,
     toBlock:   'latest',
   };
 
@@ -336,7 +336,7 @@ export async function fetchUserTickets(address, provider, chain = 'POLYGON') {
       null,
       ethers.zeroPadValue(address, 32),
     ],
-    fromBlock: 20212544,
+    fromBlock: 25000000,
     toBlock: 'latest',
   };
 

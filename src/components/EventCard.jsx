@@ -77,6 +77,7 @@ function EventCard({ event, onRefresh }) {
     remaining,
     totalTickets,
     ipfsCID,
+    
     imageCID,
     imageMetaURL,
     imageMetaCID,
@@ -106,46 +107,46 @@ function EventCard({ event, onRefresh }) {
         });
   };
 
-  useEffect(() => {
-    if (!rawImage) {
-      setImgSrc(fallbackImage);
-      return;
-    }
-    async function resolveImage() {
-      try {
-        let imageUrl = rawImage.trim();
-        let candidates = [];
-        const isIPFS = imageUrl.startsWith('ipfs://');
-        const isCIDOnly = /^[a-zA-Z0-9]+$/.test(imageUrl);
-        if (isIPFS) {
-          const [, cid, ...pathParts] = imageUrl.split('/');
-          const path = pathParts.join('/');
-          candidates = IPFS_GATEWAYS.map((gw) => `${gw}/${cid}/${path}`);
-        } else if (isCIDOnly) {
-          candidates = IPFS_GATEWAYS.map((gw) => `${gw}/${imageUrl}`);
-        } else if (imageUrl.startsWith('http')) {
-          candidates = [imageUrl];
-        } else {
-          setImgSrc(fallbackImage);
-          return;
-        }
-        for (let url of candidates) {
-          try {
-            const res = await fetch(url, { method: 'HEAD' });
-            if (res.ok) {
-              setImgSrc(url);
-              return;
-            }
-          } catch {}
-        }
-        setImgSrc(fallbackImage);
-      } catch (e) {
-        console.error('Image resolution error:', e);
-        setImgSrc(fallbackImage);
+ useEffect(() => {
+  async function fetchImageFromMetadata() {
+    try {
+      const metadataUrl = ipfsCID?.startsWith('ipfs://')
+        ? `${IPFS_GATEWAYS[0]}/${ipfsCID.replace('ipfs://', '')}`
+        : ipfsCID;
+
+      const res = await fetch(metadataUrl);
+      if (!res.ok) throw new Error('Metadata fetch failed');
+
+      const metadata = await res.json();
+      let image = metadata.image || '';
+
+      if (!image) throw new Error('No image found in metadata');
+
+      const imageCID = image.startsWith('ipfs://')
+        ? image.replace('ipfs://', '')
+        : image;
+
+      const candidates = IPFS_GATEWAYS.map((gw) => `${gw}/${imageCID}`);
+      for (let url of candidates) {
+        try {
+          const head = await fetch(url, { method: 'HEAD' });
+          if (head.ok) {
+            setImgSrc(url);
+            return;
+          }
+        } catch {}
       }
+
+      setImgSrc(fallbackImage);
+    } catch (err) {
+      console.error('Failed to load event image:', err);
+      setImgSrc(fallbackImage);
     }
-    resolveImage();
-  }, [rawImage]);
+  }
+
+  fetchImageFromMetadata();
+}, [ipfsCID]);
+
 
   const handlePurchase = async () => {
     setLoading(true);
@@ -190,14 +191,14 @@ function EventCard({ event, onRefresh }) {
   };
 
   const maxQty = Math.max(0, remainingCount);
-  console.log(imageMetaCID);
+  // console.log(imageMetaCID);
   return (
     <div
       className={`flex flex-col overflow-hidden rounded-3xl ${styles.blur} ${styles.cardBg} ${styles.border} ${styles.shadow} ${styles.shadowHover} transition-shadow duration-300`}
     >
       <div className="relative h-48 w-full">
         <img
-          src={imageMetaCID}
+          src={imageMetaCID||fallbackImage}
           alt={name}
           onError={() => setImgSrc(fallbackImage)}
           className="w-full h-full object-cover"
